@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Love Cam - HTML Version</title>
+    
+    <!-- Load Library MediaPipe & TensorFlowJS via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: #000;
+            color: #00ff41;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Container Kamera */
+        .camera-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Video Kamera Depan Hide (Di-render via Canvas) */
+        #webcam {
+            display: none;
+        }
+
+        /* Canvas Utama untuk Menampilkan Output */
+        #output-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Effect Cermin (Mirroring) Kamera Depan */
+        }
+
+        /* Overlay UI Cyber/Hacker */
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .status-box {
+            background: rgba(0, 20, 0, 0.75);
+            border: 1px solid #00ff41;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="camera-container">
+        <!-- Overlay Teks Hacker di Kiri Atas -->
+        <div class="ui-overlay">
+            <div class="status-box">
+                AI_CAM: ACTIVE<br>
+                <span id="face-status" style="color: #ffff00;">SCANNING FACE...</span>
+            </div>
+        </div>
+
+        <!-- Element Video Hidden & Canvas -->
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output-canvas"></canvas>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output-canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const faceStatusText = document.getElementById('face-status');
+
+        function resizeCanvas() {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 1. FUNGSI UNTUK MENGGAMBAR LOVE MEMBULAT (CARDIOID)
+        function drawRoundedHeart(ctx, centerX, centerY, scale, color, thickness) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = thickness;
+
+            for (let t = 0; t <= Math.PI * 2; t += 0.05) {
+                // Formula Matematika Kurva Heart Membulat
+                let x = 16 * Math.pow(Math.sin(t), 3);
+                let y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+
+                let px = centerX + x * scale;
+                let py = centerY + y * scale;
+
+                if (t === 0) {
+                    ctx.moveTo(px, py);
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 2. DETEKSI GESTUR 2 JARI (✌️)
+        function isVictoryGesture(landmarks) {
+            // Landmark Jari
+            const indexUp = landmarks[8].y < landmarks[6].y;
+            const middleUp = landmarks[12].y < landmarks[10].y;
+            const ringDown = landmarks[16].y > landmarks[14].y;
+            const pinkyDown = landmarks[20].y > landmarks[18].y;
+
+            return indexUp && middleUp && ringDown && pinkyDown;
+        }
+
+        // 3. PROSES HASIL DETEKSI MEDIAPIPE
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            // Tampilkan Kamera Depan
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            // A. Indikator Status Akses Wajah
+            faceStatusText.innerText = "ACCESS GRANTED!";
+            faceStatusText.style.color = "#00ff41";
+
+            // B. Gambar Love Ikon Membulat di Kiri Atas (Statis)
+            // Mengingat Canvas di-mirror, posisi kiri berada di koordinat width - offset
+            const leftX = canvasElement.width - 70; 
+            drawRoundedHeart(canvasCtx, leftX, 100, 2.5, "#ff007f", 3);
+
+            // C. Deteksi Tangan & Gestur 2 Jari (✌️)
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+
+                    if (isVictoryGesture(landmarks)) {
+                        // Ambil posisi titik tengah antara telunjuk (8) dan jari tengah (12)
+                        const idxX = landmarks[8].x * canvasElement.width;
+                        const idxY = landmarks[8].y * canvasElement.height;
+                        const midX = landmarks[12].x * canvasElement.width;
+                        const midY = landmarks[12].y * canvasElement.height;
+
+                        const centerX = (idxX + midX) / 2;
+                        const centerY = ((idxY + midY) / 2) - 60; // Posisi love di atas jari
+
+                        // Animasi Ukuran Love Membulat
+                        const animScale = 3.5 + Math.sin(Date.now() / 150) * 0.5;
+
+                        // Gambar Love Membulat di Atas Jari
+                        drawRoundedHeart(canvasCtx, centerX, centerY, animScale, "#ff0055", 4);
+                        drawRoundedHeart(canvasCtx, centerX, centerY, animScale * 0.6, "#ffffff", 2);
+                    }
+                }
+            }
+
+            canvasCtx.restore();
+        }
+
+        // 4. INISIALISASI MEDIAPIPE HANDS
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+
+        hands.onResults(onResults);
+
+        // 5. AKSES KAMERA DEPAN
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 1280,
+            height: 720,
+            facingMode: "user" // Menggunakan Kamera Depan
+        });
+
+        camera.start();
+    </script>
+</body>
+</html>
